@@ -1,0 +1,10 @@
+.git/
+.venv/
+.deps/
+**/__pycache__/
+**/*.pyc
+.env
+.env.*
+!.env.example
+deploy/rendered*
+*.log

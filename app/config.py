@@ -10,11 +10,17 @@ from dotenv import dotenv_values
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-HOST = "127.0.0.1"
-PORT = 3000
+HOST = os.environ.get("HOST", "127.0.0.1")
+PORT = int(os.environ.get("PORT", "3000"))
 LIVE_MODEL = "gemini-live-2.5-flash-native-audio"
 PROBE_MODEL = "gemini-2.5-flash"
-ALLOWED_ORIGINS = {f"http://localhost:{PORT}", f"http://{HOST}:{PORT}"}
+ALLOWED_ORIGINS = {
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    f"http://localhost:{PORT}",
+    f"http://127.0.0.1:{PORT}",
+    *(origin.strip().rstrip("/") for origin in os.environ.get("ALLOWED_ORIGINS", "").split(",") if origin.strip()),
+}
 
 
 @dataclass(frozen=True)

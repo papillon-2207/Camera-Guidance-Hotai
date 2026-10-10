@@ -148,9 +148,9 @@ class LiveBridge:
 
 
 async def live(request):
-    """Accept only the local UI, then manage one authenticated Cloud session."""
+    """Accept configured UI origins, then manage one authenticated Cloud session."""
     if request.headers.get("Origin") not in ALLOWED_ORIGINS:
-        raise web.HTTPForbidden(text="Open the interface at http://localhost:3000")
+        raise web.HTTPForbidden(text="This page origin is not allowed. Check ALLOWED_ORIGINS.")
     ws = web.WebSocketResponse(max_msg_size=2 * 1024 * 1024, heartbeat=30)
     await ws.prepare(request)
     key = ""

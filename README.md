@@ -1,5 +1,20 @@
 # Gemini Live camera assistant
 
+## Docker and Google Cloud Run
+
+The deployment files follow the Docker/Cloud Build structure in the `ML` project.
+See [deploy/README.md](deploy/README.md) for Secret Manager setup, build permissions,
+private/public access, and deployment commands. Local container testing uses:
+
+```powershell
+docker compose up --build -d
+```
+
+Cloud Run deployment uses `deploy/deploy.ps1` and `cloudbuild.yaml`. The container
+honors `HOST` and `PORT`, provides `/healthz`, and supports HTTPS WebSockets with
+an explicit `ALLOWED_ORIGINS` setting. Local Python defaults remain port 3000 on
+loopback. `.env` is supplied at runtime, never copied into the container image.
+
 Local Python 3.11+ app for camera/microphone conversation and spoken photo framing
 guidance through the Google Cloud Gemini Live API. The browser talks to a Python
 backend; the authorization key stays on the backend.

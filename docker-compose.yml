@@ -1,0 +1,19 @@
+services:
+  gemini-live-camera:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gemini-live-camera:local
+    ports:
+      - "127.0.0.1:3000:8080"
+    env_file:
+      - .env
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

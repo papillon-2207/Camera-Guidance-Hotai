@@ -158,7 +158,8 @@ async function connect() {
   try {
     await audio.context.resume();
     status('Connecting to Gemini Live...');
-    state.socket = new WebSocket(`ws://${location.host}/live`);
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    state.socket = new WebSocket(`${protocol}//${location.host}/live`);
     state.socket.onmessage = receiveMessage;
     state.socket.onerror = () => status('WebSocket failed. Check the Python server.');
     state.socket.onclose = () => {

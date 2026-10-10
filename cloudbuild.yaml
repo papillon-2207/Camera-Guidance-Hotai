@@ -1,0 +1,63 @@
+substitutions:
+  _REGION: us-central1
+  _REPOSITORY: hotai
+  _SERVICE: gemini-live-camera
+  _IMAGE: gemini-live-camera
+  _TAG: latest
+  _GEMINI_LOCATION: us-central1
+  _SERVICE_ACCOUNT: gemini-live-service@papillon-2207.iam.gserviceaccount.com
+  _SECRET: gemini-live-api-key
+  _SECRET_VERSION: "1"
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE}:${_TAG}
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE}:${_TAG}
+
+  - name: python:3.12-slim
+    entrypoint: python
+    args:
+      - scripts/render_cloudrun.py
+      - --project
+      - ${PROJECT_ID}
+      - --service
+      - ${_SERVICE}
+      - --image
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE}:${_TAG}
+      - --service-account
+      - ${_SERVICE_ACCOUNT}
+      - --gemini-location
+      - ${_GEMINI_LOCATION}
+      - --secret
+      - ${_SECRET}
+      - --secret-version
+      - ${_SECRET_VERSION}
+      - --output
+      - /workspace/rendered-service.yaml
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        gcloud run services replace /workspace/rendered-service.yaml --project '${PROJECT_ID}' --region '${_REGION}' --quiet
+        SERVICE_URL=$$(gcloud run services describe '${_SERVICE}' --project '${PROJECT_ID}' --region '${_REGION}' --format='value(status.url)')
+        test -n "$$SERVICE_URL"
+        gcloud run services update '${_SERVICE}' --project '${PROJECT_ID}' --region '${_REGION}' --update-env-vars "ALLOWED_ORIGINS=$$SERVICE_URL" --quiet
+        echo "Cloud Run service: $$SERVICE_URL"
+
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE}:${_TAG}
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1200s

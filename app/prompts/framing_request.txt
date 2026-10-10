@@ -1,0 +1,4 @@
+Give camera framing guidance for this photo subject: {subject!r}.
+Use this latest image only. If it is fully visible and centered, explicitly say
+it is centered and I can take the picture now; otherwise give the single most
+useful correction.

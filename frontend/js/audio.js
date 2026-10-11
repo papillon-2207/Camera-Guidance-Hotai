@@ -31,6 +31,26 @@ export class AudioController {
     return bytes.length;
   }
 
+  async captureBeep() {
+    if (!this.context || this.context.state === 'closed') return;
+    try {
+      await this.context.resume();
+      const tone = this.context.createOscillator();
+      const volume = this.context.createGain();
+      const now = this.context.currentTime;
+      tone.frequency.setValueAtTime(880, now);
+      volume.gain.setValueAtTime(0, now);
+      volume.gain.linearRampToValueAtTime(0.15, now + 0.01);
+      volume.gain.linearRampToValueAtTime(0, now + 0.16);
+      tone.connect(volume).connect(this.context.destination);
+      tone.onended = () => { tone.disconnect(); volume.disconnect(); };
+      tone.start(now);
+      tone.stop(now + 0.18);
+    } catch {
+      // The visual capture confirmation remains available if audio is blocked.
+    }
+  }
+
   clear() {
     for (const output of this.playing) { try { output.stop(); } catch {} }
     this.playing.clear();

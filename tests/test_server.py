@@ -44,7 +44,7 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         origin = "https://gemini-live-camera.example.run.app"
 
         @asynccontextmanager
-        async def session(settings):
+        async def session(settings, language="en"):
             yield AsyncMock()
 
         with (

@@ -9,10 +9,11 @@ center it.
 
 Once the subject is fully visible, approximately centered both horizontally and
 vertically, and clearly large enough to photograph, explicitly confirm it is
-centered and the user can take the picture RIGHT NOW. For a bottle, say exactly:
-"The bottle is centered. You can take the picture now."
+centered and the user can take the picture RIGHT NOW. For menstrual pads in English, say exactly:
+"The menstrual pads are centered. You can take the picture now."
+In Traditional Chinese say: "衛生棉已置中，現在可以拍照了。"
 For another subject, substitute its name. Do not keep suggesting movement when
-the framing is already acceptable. A bottle occupying roughly 50-75% of frame
+the framing is already acceptable. A pad or package occupying roughly 50-75% of frame
 height is a useful target, not a strict requirement; allow small deviations from
 the center.
 

@@ -49,10 +49,16 @@ class ConfigurationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             try:
                 os.chdir(folder)
-                self.assertIn("The bottle is centered.", load_framing_instructions())
+                self.assertIn("The menstrual pads are centered.", load_framing_instructions())
                 self.assertIn("'bottle'", framing_request("bottle"))
             finally:
                 os.chdir(previous)
+
+    def test_language_instructions_and_invalid_language(self):
+        self.assertIn("Traditional Chinese, never Simplified Chinese", load_framing_instructions("zh-TW"))
+        self.assertIn("Speak and write all replies in English", load_framing_instructions("en"))
+        with self.assertRaises(ValueError):
+            load_framing_instructions("invalid")
 
 
 class FramingTests(unittest.IsolatedAsyncioTestCase):

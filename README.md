@@ -200,3 +200,11 @@ redact the configured key. Avoid HTTP/WebSocket debug logging that might expose 
 - [Live SDK tutorial](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/live-api/get-started-sdk)
 - [Live protocol](https://docs.cloud.google.com/gemini-enterprise-agent-platform/reference/models/multimodal-live)
 - [Official Python SDK](https://github.com/googleapis/python-genai)
+
+### Menstrual pads and languages
+
+Choose English or Traditional Chinese before connecting. Gemini speaks and transcribes in that language; stop and reconnect to change it. The default photo subject is menstrual pads. Use **Analyze pads in camera** to send one current frame of one or several readable packages and hear their visible brand/features and potential benefits. Results also appear in the product panel. For another comparison, show new packaging and click again. This uses packaging claims, not a verified brand catalog or product performance database; unreadable brands should be reported as uncertain.
+
+The simplified interface has two actions: **Start camera guidance** (tap again to stop) and **Look at the brand** (one analysis per tap). Both start the camera and Gemini automatically, without microphone capture. English and Traditional Chinese translate the interface and Gemini replies. Changing language closes the current session; tap an action to reconnect. The browser subject is fixed to menstrual pads, and supplied subject overrides are ignored by the bridge.
+
+**Take photo** sits inside the camera preview. It captures a full-resolution local JPEG, pauses repeated guidance, and shows a **Download photo** link. It does not upload the saved photo.

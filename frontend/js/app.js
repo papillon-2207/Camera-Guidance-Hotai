@@ -2,203 +2,154 @@ import { AudioController } from './audio.js';
 
 const $ = id => document.getElementById(id);
 const audio = new AudioController();
-const state = {
-  stream: null, socket: null, ready: false, mic: false, sharing: false,
-  guiding: false, pending: false, busy: false, timer: null, deadline: null,
-  lastSpeaker: '', audioSent: 0, framesSent: 0, audioReceived: 0, photoUrl: null,
+const state = { stream: null, socket: null, ready: false, mode: null, busy: false, starting: false, timer: null, deadline: null, photoUrl: null };
+const words = {
+  en: {
+    title: 'Menstrual pad assistant', intro: 'Show your menstrual pads or packaging. Choose camera guidance or check the brand and features.',
+    capture: 'Take photo', download: 'Download photo', captured: 'Photo captured. Use Download photo to save it.', guide: 'Start camera guidance', stop: 'Stop camera guidance', analyze: 'Look at the brand', stopBrand: 'Stop brand analysis',
+    idle: 'Choose a button to start.', connecting: 'Starting camera and connecting to Gemini...', checking: 'Checking the latest camera frame...',
+    complete: 'Brand analysis complete. Show another package and tap again.', stopped: 'Stopped. Camera released.',
+    note: 'Allow camera access when asked. Replies are spoken and shown here. Brand details depend on readable packaging.',
+    timeout: 'Response timed out. Tap a button to reconnect.', disconnected: 'Disconnected. Tap a button to reconnect.',
+    error: 'Could not start. Check camera permissions and your connection.',
+  },
+  'zh-TW': {
+    capture: '\u62cd\u7167', download: '\u4e0b\u8f09\u7167\u7247', captured: '\u5df2\u62cd\u7167\uff0c\u8acb\u9ede\u9078\u4e0b\u8f09\u7167\u7247\u5132\u5b58\u3002',
+    title: '\u885b\u751f\u68c9\u5c0f\u5e6b\u624b', intro: '\u5c55\u793a\u885b\u751f\u68c9\u6216\u5305\u88dd\uff0c\u9078\u64c7\u93e1\u982d\u5f15\u5c0e\u6216\u67e5\u770b\u54c1\u724c\u7279\u8272\u3002',
+    guide: '\u958b\u59cb\u93e1\u982d\u5f15\u5c0e', stop: '\u505c\u6b62\u93e1\u982d\u5f15\u5c0e', analyze: '\u67e5\u770b\u54c1\u724c', stopBrand: '\u505c\u6b62\u54c1\u724c\u5206\u6790',
+    idle: '\u9078\u64c7\u6309\u9215\u958b\u59cb\u3002', connecting: '\u6b63\u5728\u958b\u555f\u76f8\u6a5f\u4e26\u9023\u7dda Gemini...', checking: '\u6b63\u5728\u67e5\u770b\u6700\u65b0\u756b\u9762...',
+    complete: '\u5206\u6790\u5b8c\u6210\uff0c\u53ef\u5c55\u793a\u5176\u4ed6\u5305\u88dd\u518d\u6309\u4e00\u6b21\u3002', stopped: '\u5df2\u505c\u6b62\u4e26\u95dc\u9589\u76f8\u6a5f\u3002',
+    note: '\u8acb\u5141\u8a31\u76f8\u6a5f\u5b58\u53d6\u3002\u56de\u8986\u6703\u64ad\u653e\u4e26\u986f\u793a\u5728\u9019\u88e1\uff1b\u54c1\u724c\u8cc7\u8a0a\u9700\u8981\u6e05\u695a\u53ef\u8b80\u7684\u5305\u88dd\u3002',
+    timeout: '\u56de\u61c9\u903e\u6642\uff0c\u8acb\u6309\u9215\u91cd\u65b0\u9023\u7dda\u3002', disconnected: '\u9023\u7dda\u5df2\u4e2d\u65b7\uff0c\u8acb\u6309\u9215\u91cd\u65b0\u9023\u7dda\u3002',
+    error: '\u7121\u6cd5\u958b\u59cb\uff0c\u8acb\u6aa2\u67e5\u76f8\u6a5f\u6b0a\u9650\u548c\u7db2\u8def\u9023\u7dda\u3002',
+  },
 };
-const status = text => { $('status').textContent = text; };
+const t = key => words[$('language').value][key];
+const status = key => { $('status').textContent = t(key); };
 
-function updateControls() {
-  $('connect').disabled = !state.stream || state.ready || state.socket?.readyState === WebSocket.CONNECTING;
-  $('stop').disabled = !state.stream;
-  $('capture').disabled = !state.stream;
-  $('guide').disabled = !state.ready || (state.busy && !state.guiding);
-  $('guide').textContent = state.guiding ? 'Stop framing guidance' : 'Start framing guidance';
-  $('subject').disabled = state.guiding;
-  $('mic').disabled = !state.ready || state.guiding;
-  $('camera').disabled = !state.ready || state.guiding;
-  $('send').disabled = !state.ready || state.guiding || state.busy;
-  $('mic').textContent = state.mic ? 'Pause microphone' : 'Start microphone';
-  $('camera').textContent = state.sharing ? 'Stop camera sharing' : 'Share camera';
+function controls() {
+  $('capture').disabled = !state.stream || state.starting;
+  $('capture').textContent = t('capture');
+  $('download').textContent = t('download');
+  $('guide').textContent = t(state.mode === 'guide' ? 'stop' : 'guide');
+  $('analyze').textContent = t(state.mode === 'analyze_pads' ? 'stopBrand' : 'analyze');
+  $('guide').disabled = state.starting || (state.busy && state.mode !== 'guide');
+  $('analyze').disabled = state.starting || (state.busy && state.mode !== 'analyze_pads');
+  $('language').disabled = state.starting;
 }
 
-function updateCounts() {
-  $('counts').textContent = `Audio chunks sent: ${state.audioSent} | Camera frames sent: ${state.framesSent} | Audio bytes received: ${state.audioReceived}`;
+function stop() {
+  clearTimeout(state.timer);
+  clearTimeout(state.deadline);
+  if (state.socket) { state.socket.onclose = null; state.socket.close(); }
+  state.socket = null;
+  state.stream?.getTracks().forEach(track => track.stop());
+  state.stream = null;
+  $('preview').srcObject = null;
+  state.ready = state.busy = false;
+  state.mode = null;
+  audio.clear();
+  controls();
 }
 
-function log(speaker, text) {
-  const box = $('transcript');
-  box.textContent += (speaker === state.lastSpeaker ? '' : `\n${speaker}: `) + text;
-  state.lastSpeaker = speaker;
-  box.scrollTop = box.scrollHeight;
+async function prepare() {
+  audio.context ||= new AudioContext();
+  await audio.context.resume();
+  if (!state.stream) {
+    state.stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false,
+    });
+    const video = $('preview');
+    video.srcObject = state.stream;
+    await video.play();
+  }
+  if (state.ready) return;
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const socket = new WebSocket(`${protocol}//${location.host}/live?language=${encodeURIComponent($('language').value)}`);
+  state.socket = socket;
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Connection timed out')), 35000);
+    const fail = () => { clearTimeout(timeout); reject(new Error('Connection failed')); };
+    socket.onerror = fail;
+    socket.onclose = fail;
+    socket.onmessage = event => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'ready') {
+        clearTimeout(timeout);
+        state.ready = true;
+        socket.onmessage = receive;
+        socket.onerror = () => { stop(); status('disconnected'); };
+        socket.onclose = () => { stop(); status('disconnected'); };
+        resolve();
+      } else if (data.type === 'error') {
+        clearTimeout(timeout);
+        reject(new Error(data.text));
+      }
+    };
+  });
 }
 
-function send(data) {
-  if (!state.ready || state.socket?.readyState !== WebSocket.OPEN) return false;
-  state.socket.send(JSON.stringify(data));
-  return true;
-}
-
-function cameraCanvas(fullSize = false) {
+function request() {
+  if (!state.ready || !state.mode || state.busy) return;
   const video = $('preview');
-  if (!video.videoWidth || video.readyState < 2) return null;
+  if (!video.videoWidth || video.readyState < 2) { state.timer = setTimeout(request, 300); return; }
   const canvas = document.createElement('canvas');
-  const scale = fullSize ? 1 : Math.min(1, 640 / video.videoWidth);
+  const scale = Math.min(1, 640 / video.videoWidth);
   canvas.width = Math.round(video.videoWidth * scale);
   canvas.height = Math.round(video.videoHeight * scale);
   canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-  return canvas;
+  state.socket.send(JSON.stringify({ type: state.mode, data: canvas.toDataURL('image/jpeg', 0.8).split(',')[1] }));
+  state.busy = true;
+  $('result').textContent = '';
+  status('checking');
+  state.deadline = setTimeout(() => { stop(); status('timeout'); }, 30000);
+  controls();
 }
 
-function stopGuidance(message = 'Guidance paused.') {
-  state.guiding = false;
-  clearTimeout(state.timer);
-  // Retain in-flight request state until its response finishes.
-  $('guidance').textContent = message;
-  updateControls();
-}
-
-function requestGuidance() {
-  if (!state.guiding || !state.ready || state.pending || state.busy) return;
-  const canvas = cameraCanvas();
-  if (!canvas) {
-    state.timer = setTimeout(requestGuidance, 500);
-    return;
-  }
-  const sent = send({ type: 'guide', subject: $('subject').value.trim(), data: canvas.toDataURL('image/jpeg', 0.7).split(',')[1] });
-  if (!sent) return;
-  state.pending = state.busy = true;
-  state.framesSent++;
-  updateCounts();
-  $('guidance').textContent = 'Checking the latest frame...';
-  state.deadline = setTimeout(() => {
-    stopGuidance('No completed guidance response within 30 seconds. Reconnect to retry.');
-    state.socket?.close();
-  }, 30000);
-  updateControls();
-}
-
-function resetConnection() {
-  state.ready = state.mic = state.sharing = state.pending = state.busy = false;
-  clearTimeout(state.deadline);
-  stopGuidance('Guidance is off.');
-  audio.clear();
-  updateControls();
-}
-
-async function cleanup() {
-  const socket = state.socket;
-  state.socket = null;
-  if (socket) { socket.onclose = null; socket.close(); }
-  resetConnection();
-  state.stream?.getTracks().forEach(track => track.stop());
-  state.stream = null;
-  await audio.close();
-  $('preview').srcObject = null;
-  $('level').value = 0;
-  $('devices').disabled = false;
-  updateControls();
-  status('Stopped. Camera and microphone released.');
-}
-
-async function enableDevices() {
-  try {
-    $('devices').disabled = true;
-    state.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    });
-    $('preview').srcObject = state.stream;
-    await audio.start(state.stream, data => {
-      $('level').value = Math.min(1, data.rms * 5);
-      if (state.mic && state.ready && state.socket?.readyState === WebSocket.OPEN && state.socket.bufferedAmount < 65536) {
-        state.socket.send(data.buffer);
-        state.audioSent++;
-        updateCounts();
-      }
-    });
-    updateControls();
-    status('Camera preview and microphone meter ready. Connect to Gemini.');
-  } catch (error) {
-    await cleanup();
-    status(`Device error: ${error.message}. Check browser permissions.`);
-  }
-}
-
-function receiveMessage(event) {
+function receive(event) {
   const data = JSON.parse(event.data);
-  if (data.type === 'ready') {
-    state.ready = true;
-    status(data.text);
-    updateControls();
-  } else if (data.type === 'transcript') {
-    log(data.speaker === 'you' ? 'You' : 'Gemini', data.text);
-  } else if (data.type === 'guidance') {
-    if (state.guiding) $('guidance').textContent = data.text;
-  } else if (data.type === 'audio') {
-    state.audioReceived += audio.play(data.data);
-    updateCounts();
-  } else if (data.type === 'interrupted') {
-    audio.clear();
+  if (data.type === 'guidance' || data.type === 'pad_analysis') $('result').textContent = data.text;
+  else if (data.type === 'audio') audio.play(data.data);
+  else if (data.type === 'interrupted') audio.clear();
+  else if (data.type === 'error') {
+    stop();
+    $('status').textContent = data.text;
   } else if (data.type === 'turn_complete') {
-    state.pending = state.busy = false;
-    state.lastSpeaker = '';
     clearTimeout(state.deadline);
-    updateControls();
-    if (state.guiding) state.timer = setTimeout(requestGuidance, Math.max(3000, audio.remaining * 1000 + 500));
-  } else if (data.type === 'error') {
-    stopGuidance(data.text);
-    log('Error', data.text);
-    status(data.text);
+    state.busy = false;
+    if (state.mode === 'guide') state.timer = setTimeout(request, Math.max(3000, audio.remaining * 1000 + 500));
+    else if (state.mode === 'analyze_pads') { state.mode = null; status('complete'); }
+    controls();
   }
 }
 
-async function connect() {
-  try {
-    await audio.context.resume();
-    status('Connecting to Gemini Live...');
-    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    state.socket = new WebSocket(`${protocol}//${location.host}/live`);
-    state.socket.onmessage = receiveMessage;
-    state.socket.onerror = () => status('WebSocket failed. Check the Python server.');
-    state.socket.onclose = () => {
-      state.socket = null;
-      resetConnection();
-      status('Gemini disconnected. Reconnect or Stop all.');
-    };
-    updateControls();
-  } catch (error) { resetConnection(); status(error.message); }
-}
-
-function toggleGuidance() {
-  if (state.guiding) { stopGuidance(); return; }
-  if (!$('subject').value.trim()) { $('guidance').textContent = 'Enter the photo subject first.'; return; }
-  if (state.mic) send({ type: 'audio_end' });
-  state.mic = state.sharing = false;
+async function start(mode) {
+  if (state.mode === mode) { stop(); status('stopped'); return; }
+  if (state.starting || state.busy) return;
   clearTimeout(state.timer);
-  state.guiding = true;
+  state.starting = true;
+  state.mode = mode;
   audio.clear();
-  updateControls();
-  requestGuidance();
+  status('connecting');
+  controls();
+  try { await prepare(); request(); }
+  catch { stop(); status('error'); }
+  finally { state.starting = false; controls(); }
 }
 
-function shareFrame() {
-  if (!state.sharing || !state.ready) return;
-  const canvas = cameraCanvas();
-  if (canvas && state.socket.bufferedAmount < 65536) {
-    send({ type: 'video', data: canvas.toDataURL('image/jpeg', 0.6).split(',')[1] });
-    state.framesSent++;
-    updateCounts();
-  }
-  state.timer = setTimeout(shareFrame, 1000);
-}
-
-function takePhoto() {
-  const canvas = cameraCanvas(true);
-  if (!canvas) { status('Wait for the camera preview before taking a photo.'); return; }
-  stopGuidance('Photo captured. Start guidance again for another photo.');
+$('capture').onclick = () => {
+  const video = $('preview');
+  if (!state.stream || !video.videoWidth || video.readyState < 2) return;
+  audio.context?.resume().catch(() => {});
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  // Pause repeated guidance, retaining any in-flight turn until it finishes.
+  clearTimeout(state.timer);
+  state.mode = null;
   audio.clear();
+  controls();
   canvas.toBlob(blob => {
     if (!blob) return;
     if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
@@ -206,43 +157,20 @@ function takePhoto() {
     $('photo').src = state.photoUrl;
     $('photo').hidden = false;
     $('download').href = state.photoUrl;
-    $('download').download = `photo-${Date.now()}.jpg`;
+    $('download').download = `menstrual-pads-${Date.now()}.jpg`;
     $('download').hidden = false;
-    status('Photo captured locally. Select Download photo to save it.');
+    status('captured');
+    audio.captureBeep();
   }, 'image/jpeg', 0.95);
-}
-
-$('devices').onclick = enableDevices;
-$('connect').onclick = connect;
-$('guide').onclick = toggleGuidance;
-$('capture').onclick = takePhoto;
-$('stop').onclick = cleanup;
-$('mic').onclick = () => {
-  state.mic = !state.mic;
-  if (!state.mic) send({ type: 'audio_end' });
-  updateControls();
-  status(state.mic ? 'Microphone streaming. Speak, then pause for Gemini.' : 'Microphone paused.');
 };
-$('camera').onclick = () => {
-  state.sharing = !state.sharing;
-  clearTimeout(state.timer);
-  if (state.sharing) shareFrame();
-  updateControls();
-  status(state.sharing ? 'Sharing camera. Ask Gemini what it sees.' : 'Camera sharing stopped.');
+$('guide').onclick = () => start('guide');
+$('analyze').onclick = () => start('analyze_pads');
+$('language').onchange = () => {
+  stop();
+  document.documentElement.lang = $('language').value;
+  for (const key of ['title', 'intro', 'note']) $(key).textContent = t(key);
+  $('result').textContent = '';
+  status('idle');
 };
-$('form').onsubmit = event => {
-  event.preventDefault();
-  const text = $('message').value.trim();
-  if (text && state.ready && !state.guiding && !state.busy && send({ type: 'text', text })) {
-    state.busy = true;
-    log('You', text);
-    $('message').value = '';
-    updateControls();
-  }
-};
-window.addEventListener('beforeunload', () => {
-  state.socket?.close();
-  state.stream?.getTracks().forEach(track => track.stop());
-  if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
-});
-updateControls();
+window.addEventListener('pagehide', stop);
+controls();

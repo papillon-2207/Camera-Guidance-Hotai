@@ -1,75 +1,34 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Gemini Live - Camera Framing Assistant</title>
-    <link rel="stylesheet" href="/styles.css">
-    <script type="module" src="/js/app.js"></script>
-  </head>
-  <body>
-    <main>
-      <h1>Camera framing assistant</h1>
-      <p>
-        Hold up a bottle and let Gemini guide your camera position. Enable your
-        devices, connect, then start framing guidance. Use headphones for spoken directions.
-      </p>
-
-      <section class="card" aria-label="Camera and microphone">
-        <div class="controls">
-          <button id="devices">Enable camera &amp; mic</button>
-          <button class="primary" id="connect" disabled>Connect to Gemini</button>
-          <button id="mic" disabled>Start microphone</button>
-          <button id="camera" disabled>Share camera</button>
-          <button id="stop" disabled>Stop all</button>
-        </div>
-        <strong id="status" role="status">Devices are off.</strong>
-        <div class="viewfinder">
-          <video id="preview" autoplay muted playsinline></video>
-          <div class="crosshair" aria-hidden="true"></div>
-        </div>
-        <label>
-          Microphone level
-          <meter id="level" min="0" max="1" value="0"></meter>
-        </label>
-        <p class="small">
-          Camera preview stays local until you start sharing or framing guidance.
-          Microphone audio is sent only while the microphone is started and Gemini is connected.
-        </p>
-        <div id="counts">
-          Audio chunks sent: 0 | Camera frames sent: 0 | Audio bytes received: 0
-        </div>
-      </section>
-
-      <section class="card" aria-label="Framing and photo capture">
-        <label for="subject">Photo subject</label>
-        <input id="subject" value="bottle" maxlength="120">
-        <div class="controls framing-controls">
-          <button id="guide" class="primary" disabled>Start framing guidance</button>
-          <button id="capture" disabled>Take photo</button>
-        </div>
-        <p id="guidance" role="status">Guidance is off. Photos are taken manually.</p>
-        <p class="small">
-          Gemini gives visual estimates, not exact measurements. Move slowly and wait
-          for the next instruction. The preview and saved photo use the same unmirrored view.
-        </p>
-        <a id="download" hidden>Download photo</a>
-        <img id="photo" hidden alt="Your captured photo">
-      </section>
-
-      <section class="card" aria-label="Conversation">
-        <strong>Conversation</strong>
-        <div id="transcript" role="log" aria-live="polite"></div>
-        <form id="form">
-          <input
-            id="message"
-            aria-label="Message to Gemini"
-            placeholder="Try: What can you see?"
-            maxlength="2000"
-          >
-          <button id="send" disabled>Send</button>
-        </form>
-      </section>
-    </main>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Menstrual pad assistant</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body>
+<main>
+  <h1 id="title">Menstrual pad assistant</h1>
+  <p id="intro">Show your menstrual pads or packaging. Choose camera guidance or check the brand and features.</p>
+  <section class="card">
+    <label for="language">Language / &#35486;&#35328;</label>
+    <select id="language"><option value="en">English</option><option value="zh-TW">&#32321;&#39636;&#20013;&#25991;</option></select>
+    <div class="controls framing-controls">
+      <button id="guide" class="primary">Start camera guidance</button>
+      <button id="analyze">Look at the brand</button>
+    </div>
+    <p id="status" role="status">Choose a button to start.</p>
+    <div class="viewfinder">
+      <video id="preview" autoplay muted playsinline></video>
+      <div class="crosshair" aria-hidden="true"></div>
+      <button id="capture" class="shutter" disabled>Take photo</button>
+    </div>
+    <a id="download" hidden>Download photo</a>
+    <img id="photo" hidden alt="Captured menstrual pads">
+    <p id="result" role="status" aria-live="polite"></p>
+    <p id="note" class="small">Allow camera access when asked. Replies are spoken and shown here. Brand details depend on readable packaging.</p>
+  </section>
+</main>
+</body>
 </html>

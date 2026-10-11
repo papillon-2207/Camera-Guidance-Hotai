@@ -9,12 +9,12 @@ from google.genai import types
 
 from .config import ALLOWED_ORIGINS, LIVE_MODEL, Settings, load_settings
 from .diagnostics import error_message, redact
-from .framing import decode_frame, guide_camera, load_framing_instructions
+from .framing import analyze_pads, decode_frame, guide_camera, load_framing_instructions
 from .gemini_client import close_client, create_client
 
 
 @asynccontextmanager
-async def open_live_session(settings: Settings):
+async def open_live_session(settings: Settings, language="en"):
     """Bound connection setup, and always release both SDK transports."""
     client = create_client(settings)
     try:
@@ -22,7 +22,7 @@ async def open_live_session(settings: Settings):
             model=settings.model_path(LIVE_MODEL),
             config=types.LiveConnectConfig(
                 response_modalities=["AUDIO"],
-                system_instruction=load_framing_instructions(),
+                system_instruction=load_framing_instructions(language),
                 input_audio_transcription=types.AudioTranscriptionConfig(),
                 output_audio_transcription=types.AudioTranscriptionConfig(),
             ),
@@ -46,6 +46,7 @@ class LiveBridge:
         self.api_key = api_key
         self.guidance_pending = False
         self.guidance_text = ""
+        self.response_kind = "guidance"
 
     async def run(self):
         tasks = [
@@ -81,13 +82,17 @@ class LiveBridge:
         if not isinstance(data, dict):
             raise ValueError("Expected a browser message object")
         kind = data.get("type")
-        if kind == "guide":
+        if kind in {"guide", "analyze_pads"}:
             if self.guidance_pending:
                 return
             frame = decode_frame(data["data"])
             self.guidance_pending = True
             self.guidance_text = ""
-            await guide_camera(self.session, frame, data.get("subject", "bottle"))
+            self.response_kind = "guidance" if kind == "guide" else "pad_analysis"
+            if kind == "guide":
+                await guide_camera(self.session, frame)
+            else:
+                await analyze_pads(self.session, frame)
         elif kind == "video":
             await self.session.send_realtime_input(
                 video=types.Blob(data=decode_frame(data["data"]), mime_type="image/jpeg"),
@@ -142,7 +147,7 @@ class LiveBridge:
         if self.guidance_pending and speaker == "gemini":
             self.guidance_text += transcript.text
             await self.ws.send_json({
-                "type": "guidance",
+                "type": self.response_kind,
                 "text": redact(self.guidance_text, self.api_key),
             })
 
@@ -157,7 +162,10 @@ async def live(request):
     try:
         settings = load_settings()
         key = settings.api_key
-        async with open_live_session(settings) as session:
+        language = request.query.get("language", "en")
+        if language not in {"en", "zh-TW"}:
+            raise ValueError("Unsupported language")
+        async with open_live_session(settings, language=language) as session:
             await ws.send_json({
                 "type": "ready",
                 "text": f"Gemini Live connected | {settings.project} | {settings.location}",

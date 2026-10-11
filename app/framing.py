@@ -5,9 +5,14 @@ from google.genai import types
 from .config import PROMPTS_DIR
 
 
-def load_framing_instructions() -> str:
+def load_framing_instructions(language="en") -> str:
     """Read on each new Live connection so prompt edits need only a reconnect."""
-    return (PROMPTS_DIR / "framing.txt").read_text(encoding="utf-8").strip()
+    if language not in {"en", "zh-TW"}:
+        raise ValueError("Unsupported language")
+    language_name = "English" if language == "en" else "Traditional Chinese, never Simplified Chinese"
+    instructions = (PROMPTS_DIR / "framing.txt").read_text(encoding="utf-8").strip()
+    product = (PROMPTS_DIR / "pad_analysis.txt").read_text(encoding="utf-8").strip()
+    return f"{instructions}\n\n{product}\n\nSpeak and write all replies in {language_name}."
 
 
 def framing_request(subject: str) -> str:
@@ -22,7 +27,7 @@ def decode_frame(encoded):
     return frame
 
 
-async def guide_camera(session, frame, subject="bottle"):
+async def guide_camera(session, frame, subject="menstrual pads"):
     """Send one current camera frame and request one spoken framing instruction."""
     subject = str(subject).strip()[:120]
     if not subject:
@@ -32,6 +37,18 @@ async def guide_camera(session, frame, subject="bottle"):
         turns=types.Content(role="user", parts=[
             types.Part.from_bytes(data=frame, mime_type="image/jpeg"),
             types.Part(text=framing_request(subject)),
+        ]),
+        turn_complete=True,
+    )
+
+
+async def analyze_pads(session, frame):
+    """Analyze visible packaging in one ordered image/text turn."""
+    request = (PROMPTS_DIR / "pad_analysis_request.txt").read_text(encoding="utf-8").strip()
+    await session.send_client_content(
+        turns=types.Content(role="user", parts=[
+            types.Part.from_bytes(data=frame, mime_type="image/jpeg"),
+            types.Part(text=request),
         ]),
         turn_complete=True,
     )

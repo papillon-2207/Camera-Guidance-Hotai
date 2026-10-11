@@ -1,0 +1,6 @@
+Describe the menstrual pad brands/products visible in this latest image.
+For each identifiable product, explain its readable packaging features and their
+potential practical benefits. Compare visible options when there are several.
+Clearly separate label claims from uncertain information. If brand or details are
+unreadable, ask me to bring the packaging closer instead of guessing.
+Reply in the session's selected language.
